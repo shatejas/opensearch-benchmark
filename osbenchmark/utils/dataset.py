@@ -24,10 +24,12 @@ class Context(Enum):
     INDEX = 1
     QUERY = 2
     NEIGHBORS = 3
-    MAX_DISTANCE_NEIGHBORS = 4
-    MIN_SCORE_NEIGHBORS = 5
-    PARENTS = 6
-    ATTRIBUTES = 7
+    DELETE = 4
+    MAX_DISTANCE_NEIGHBORS = 5
+    MIN_SCORE_NEIGHBORS = 6
+    PARENTS = 7
+    ATTRIBUTES = 8
+
 
 
 class DataSet(ABC):
@@ -156,6 +158,9 @@ class HDF5DataSet(DataSet):
 
         if context == Context.ATTRIBUTES:
             return "attributes"
+
+        if context == Context.DELETE:
+            return "delete"
 
         raise Exception("Unsupported context")
 
