@@ -62,6 +62,7 @@ def register_default_runners():
     register_runner(workload.OperationType.ScrollSearch, Query(), async_runner=True)
     register_runner(workload.OperationType.VectorSearch, Query(), async_runner=True)
     register_runner(workload.OperationType.BulkVectorDataSet, BulkVectorDataSet(), async_runner=True)
+    register_runner(workload.OperationType.BulkVectorDelete, BulkVectorDelete(), async_runner=True)
     register_runner(workload.OperationType.RawRequest, RawRequest(), async_runner=True)
     register_runner(workload.OperationType.Composite, Composite(), async_runner=True)
     register_runner(workload.OperationType.SubmitAsyncSearch, SubmitAsyncSearch(), async_runner=True)
@@ -834,7 +835,7 @@ class TrainKnnModel(Runner):
 
 
 # TODO: Add retry logic to BulkIndex, so that we can remove BulkVectorDataSet and use BulkIndex.
-class BulkVectorDataSet(Runner):
+class  BulkVectorDataSet(Runner):
     """
     Bulk inserts vector search dataset of type hdf5, bigann
     """
@@ -863,6 +864,28 @@ class BulkVectorDataSet(Runner):
     def __repr__(self, *args, **kwargs):
         return self.NAME
 
+class BulkVectorDelete(Runner):
+    async def __call__(self, opensearch, params):
+        size = parse_int_parameter("size", params)
+        retries = parse_int_parameter("retries", params, 0) + 1
+
+        for attempt in range(retries):
+            try:
+                request_context_holder.on_client_request_start()
+                await opensearch.bulk(
+                    body=params["body"]
+                )
+                request_context_holder.on_client_request_end()
+
+                return size, "docs"
+            except ConnectionTimeout:
+                self.logger.warning("Bulk vector ingestion timed out. Retrying attempt: %d", attempt)
+
+        raise TimeoutError("Failed to submit bulk request in specified number "
+                           "of retries: {}".format(retries))
+
+    def __repr__(self, *args, **kwargs):
+        return "bulk-vector-delete"
 
 class ForceMerge(Runner):
     """
