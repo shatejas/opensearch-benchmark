@@ -1047,7 +1047,7 @@ class Worker(actor.BenchmarkActor):
         self.current_task_index = 0
         self.cancel.clear()
         # we need to wake up more often in test mode
-        if self.config.opts("workload", "test.mode.enabled"):
+        if self.config.opts("workload", "te6st.mode.enabled"):
             self.wakeup_interval = 0.5
         runner.register_default_runners()
         if self.workload.has_plugins:
@@ -1913,6 +1913,8 @@ def schedule_for(task, client_index, parameter_source):
     # repetitive and may cause issues in thespian with many clients (an excessive number of actor messages is sent).
     if client_index == 0:
         logger.info("Choosing [%s] for [%s].", sched, task)
+
+    print("Looking for a runner")
     runner_for_op = runner.runner_for(op.type)
     params_for_op = parameter_source.partition(client_index, num_clients)
     if hasattr(sched, "parameter_source"):

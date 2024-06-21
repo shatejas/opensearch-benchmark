@@ -1162,6 +1162,70 @@ class VectorSearchPartitionParamSource(VectorDataSetPartitionParamSource):
         }
 
 
+class BulkDeleteVectorsFromDataSetParamSource(VectorDataSetPartitionParamSource):
+    DEFAULT_RETRIES = 10
+    PARAMS_NAME_ID_FIELD_NAME = "id-field-name"
+    DEFAULT_ID_FIELD_NAME = "_id"
+
+    def __init__(self, workload, params, **kwargs):
+        super().__init__(workload, params, Context.DELETE, **kwargs)
+        self.bulk_size: int = parse_int_parameter("bulk_size", params)
+        self.retries: int = parse_int_parameter("retries", params,
+                                                self.DEFAULT_RETRIES)
+        self.index_name: str = parse_string_parameter("index", params)
+        self.id_field_name: str = parse_string_parameter(
+            self.PARAMS_NAME_ID_FIELD_NAME, params, self.DEFAULT_ID_FIELD_NAME)
+
+    def bulk_transform(self, partition: np.ndarray, action) -> List[Dict[str, Any]]:
+        """Partitions and transforms a list of vectors into OpenSearch's bulk
+        injection format.
+        Args:
+            offset: to start counting from
+            partition: An array of vectors to transform.
+            action: Bulk API action.
+        Returns:
+            An array of transformed vectors in bulk format.
+        """
+        actions = []
+        _ = [
+            actions.extend(action(self.id_field_name, partition[i + self.current][0]))
+            for i in range(len(partition))
+        ]
+        return actions
+    def params(self):
+        """
+        Returns: A bulk index parameter with vectors from a data set.
+        """
+        if self.current >= self.num_vectors + self.offset:
+            raise StopIteration
+
+        def action(id_field_name, doc_id):
+            # support only index operation
+            bulk_action = 'delete'
+            metadata = {
+                '_index': self.index_name
+            }
+            # Add id field to metadata only if it is _id
+            if id_field_name == self.DEFAULT_ID_FIELD_NAME:
+                metadata.update({id_field_name: doc_id})
+            return {bulk_action: metadata}
+
+        remaining_vectors_in_partition = self.num_vectors + self.offset - self.current
+        # update bulk size if number of vectors to read is less than actual bulk size
+        bulk_size = min(self.bulk_size, remaining_vectors_in_partition)
+        partition = self.data_set.read(bulk_size)
+        body = self.bulk_transform(partition, action)
+        size = len(body) // 2
+        self.current += size
+        self.percent_completed = self.current / self.total
+
+        return {
+            "body": body,
+            "retries": self.retries,
+            "size": size
+        }
+
+
 class BulkVectorsFromDataSetParamSource(VectorDataSetPartitionParamSource):
     """ Create bulk index requests from a data set of vectors.
 
@@ -1660,6 +1724,7 @@ class SourceOnlyIndexDataReader(IndexDataReader):
 
 register_param_source_for_operation(workload.OperationType.Bulk, BulkIndexParamSource)
 register_param_source_for_operation(workload.OperationType.BulkVectorDataSet, BulkVectorsFromDataSetParamSource)
+register_param_source_for_operation(workload.OperationType.BulkVectorDelete, BulkDeleteVectorsFromDataSetParamSource)
 register_param_source_for_operation(workload.OperationType.Search, SearchParamSource)
 register_param_source_for_operation(workload.OperationType.VectorSearch, VectorSearchParamSource)
 register_param_source_for_operation(workload.OperationType.CreateIndex, CreateIndexParamSource)

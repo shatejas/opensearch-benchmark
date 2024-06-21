@@ -54,6 +54,7 @@ __RUNNERS = {}
 
 def register_default_runners():
     register_runner(workload.OperationType.Bulk, BulkIndex(), async_runner=True)
+    register_runner(workload.OperationType.BulkVectorDelete, BulkDelete(), async_runner=True)
     register_runner(workload.OperationType.ForceMerge, ForceMerge(), async_runner=True)
     register_runner(workload.OperationType.IndexStats, Retry(IndicesStats()), async_runner=True)
     register_runner(workload.OperationType.NodeStats, NodeStats(), async_runner=True)
@@ -652,8 +653,12 @@ class BulkIndex(Runner):
         return "bulk-index"
 
 
+class BulkDelete(BulkIndex):
+    def __repr__(self, *args, **kwargs):
+        return "bulk-vector-delete"
+
 # TODO: Add retry logic to BulkIndex, so that we can remove BulkVectorDataSet and use BulkIndex.
-class BulkVectorDataSet(Runner):
+class  BulkVectorDataSet(Runner):
     """
     Bulk inserts vector search dataset of type hdf5, bigann
     """

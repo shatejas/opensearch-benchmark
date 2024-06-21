@@ -24,6 +24,7 @@ class Context(Enum):
     INDEX = 1
     QUERY = 2
     NEIGHBORS = 3
+    DELETE = 4
 
 
 class DataSet(ABC):
@@ -140,6 +141,9 @@ class HDF5DataSet(DataSet):
 
         if context == Context.QUERY:
             return "test"
+
+        if context == Context.DELETE:
+            return "delete"
 
         raise Exception("Unsupported context")
 
