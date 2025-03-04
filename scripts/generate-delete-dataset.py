@@ -77,6 +77,28 @@ class DeleteDataset(object):
 
         return updates_indices[nearest_neighbor_indices]
 
+class AddTenantIds(object):
+    def __init__(self, input_file, output_file, count):
+        self.index_set = get_data_set(HDF5DataSet.FORMAT_NAME, path=input_file, context=Context.INDEX)
+        self.query_set = get_data_set(HDF5DataSet.FORMAT_NAME, path=input_file, context=Context.QUERY)
+        self.neighbor_original_set = get_data_set(HDF5DataSet.FORMAT_NAME, path=input_file, context=Context.NEIGHBORS)
+        self.output_data_set = create_dataset_file(output_file)
+        self.count = int(count)
+
+    def generate_tenants(self):
+        corpus_size = int(self.index_set.size())
+        repeats = int(corpus_size / self.count)
+        tenants = np.tile(np.arange(1, self.count + 1), repeats)
+        tenants_arr = tenants[:corpus_size]
+
+        self.output_data_set.create_dataset('tenants', data=tenants_arr)
+        self.output_data_set.create_dataset('neighbors', data=self.neighbor_original_set.read(corpus_size))
+        self.output_data_set.create_dataset('train', data=self.index_set.read(corpus_size))
+        self.output_data_set.create_dataset('test', data=self.query_set.read(corpus_size))
+        self.output_data_set.flush()
+        self.output_data_set.close()
+
+
 
 def create_dataset_file(output_file) -> h5py.File:
     if os.path.isfile(output_file):
@@ -89,19 +111,22 @@ def create_dataset_file(output_file) -> h5py.File:
 
 
 def main(args: list) -> None:
-    opts, args = getopt.getopt(args, "", ["input_file_path=", "output_file_path=", "percent="])
+    opts, args = getopt.getopt(args, "", ["input_file_path=", "output_file_path=", "percent=", "count="])
 
     print(f'Options provided are: {opts}')
     print(f'Arguments provided are: {args}')
     input_file_path = None
     output_file_path = None
     percent = None
+    count = None
     for opt, arg in opts:
         if opt == '-h':
             print('--input_file_path <file_path> --output_file_path=<file_path> --percent <0-1>')
             sys.exit()
         if opt in '--input_file_path':
             input_file_path = arg
+        elif opt in '--count':
+            count = int(arg)
         elif opt in '--percent':
             percent = float(arg)
             print(f'--percent {percent}')
@@ -113,7 +138,8 @@ def main(args: list) -> None:
     if os.path.isfile(output_file_path):
         os.remove(output_file_path)
 
-    DeleteDataset(input_file_path, output_file_path, percent).generate_delete_set()
+    AddTenantIds(input_file_path, output_file_path, count).generate_tenants()
+    #DeleteDataset(input_file_path, output_file_path, percent).generate_delete_set()
 
 
 if __name__ == '__main__':
