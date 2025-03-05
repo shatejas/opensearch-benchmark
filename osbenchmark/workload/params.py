@@ -1317,6 +1317,11 @@ class BulkVectorsFromDataSetParamSource(VectorDataSetPartitionParamSource):
             )
             partition.attributes_data_set.seek(partition.offset)
 
+        partition.tenant_dataset = get_data_set(
+            self.parent_data_set_format, self.parent_data_set_path, Context.TENANTS
+        )
+        partition.tenant_dataset.seek(partition.offset)
+
         return partition
 
     def bulk_transform_add_attributes(self, partition: np.ndarray, action, attributes: np.ndarray) ->   List[Dict[str, Any]]:
@@ -1346,7 +1351,7 @@ class BulkVectorsFromDataSetParamSource(VectorDataSetPartitionParamSource):
         return actions
 
 
-    def bulk_transform_non_nested(self, partition: np.ndarray, action) -> List[Dict[str, Any]]:
+    def bulk_transform_non_nested(self, partition: np.ndarray, tenants:Optional[np.ndarray], action) -> List[Dict[str, Any]]:
         """
         Create bulk ingest actions for data with a non-nested field.
         """
@@ -1359,10 +1364,11 @@ class BulkVectorsFromDataSetParamSource(VectorDataSetPartitionParamSource):
         bulk_contents = []
 
         add_id_field_to_body = self.id_field_name != self.DEFAULT_ID_FIELD_NAME
-        for vec, identifier in zip(
-            partition.tolist(), range(self.current, self.current + len(partition))
+        for vec, identifier, tenant in zip(
+            partition.tolist(), range(self.current, self.current + len(partition)), tenants.tolist()
         ):
             row = {self.field_name: vec}
+            row.update({"tenant": str(tenant)})
             if add_id_field_to_body:
                 row.update({self.id_field_name: identifier})
             bulk_contents.append(row)
@@ -1372,7 +1378,7 @@ class BulkVectorsFromDataSetParamSource(VectorDataSetPartitionParamSource):
 
 
     def bulk_transform(
-        self, partition: np.ndarray, action, parents_ids: Optional[np.ndarray], attributes: Optional[np.ndarray]
+        self, partition: np.ndarray, action, parents_ids: Optional[np.ndarray], tenants:Optional[np.ndarray], attributes: Optional[np.ndarray]
     ) -> List[Dict[str, Any]]:
         """Partitions and transforms a list of vectors into OpenSearch's bulk
         injection format.
@@ -1385,7 +1391,7 @@ class BulkVectorsFromDataSetParamSource(VectorDataSetPartitionParamSource):
         """
 
         if not self.is_nested and not self.filter_attributes:
-            return self.bulk_transform_non_nested(partition, action)
+            return self.bulk_transform_non_nested(partition, tenants, action)
 
         # TODO: Assumption: we won't add attributes if we're also doing a nested query.
         if self.filter_attributes:
@@ -1466,6 +1472,7 @@ class BulkVectorsFromDataSetParamSource(VectorDataSetPartitionParamSource):
         bulk_size = min(self.bulk_size, remaining_vectors_in_partition)
 
         partition = self.data_set.read(bulk_size)
+        tenants = self.tenant_dataset.read(bulk_size)
 
         if self.is_nested:
             parent_ids = self.parent_data_set.read(bulk_size)
@@ -1477,7 +1484,7 @@ class BulkVectorsFromDataSetParamSource(VectorDataSetPartitionParamSource):
         else:
             attributes = None
 
-        body = self.bulk_transform(partition, action, parent_ids, attributes)
+        body = self.bulk_transform(partition, action, parent_ids, tenants, attributes)
         size = len(body) // 2
 
         if not self.is_nested:

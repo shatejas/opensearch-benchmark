@@ -28,6 +28,7 @@ class Context(Enum):
     MIN_SCORE_NEIGHBORS = 5
     PARENTS = 6
     ATTRIBUTES = 7
+    TENANTS = 8
 
 
 class DataSet(ABC):
@@ -145,6 +146,9 @@ class HDF5DataSet(DataSet):
 
         if context == Context.QUERY:
             return "test"
+
+        if context == Context.TENANTS:
+            return "tenants"
 
         if context == Context.PARENTS:
             return "parents" # used in nested benchmarks to get the parent document id associated with each vector.
