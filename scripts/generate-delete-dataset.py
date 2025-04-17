@@ -88,8 +88,10 @@ class AddTenantIds(object):
     def generate_tenants(self):
         corpus_size = int(self.index_set.size())
         repeats = int(corpus_size / self.count)
+        print("\nrepeats:", repeats)
         tenants = np.tile(np.arange(1, self.count + 1), repeats)
         tenants_arr = tenants[:corpus_size]
+        print("\ntenants generated, Generating dataset")
 
         self.output_data_set.create_dataset('tenants', data=tenants_arr)
         self.output_data_set.create_dataset('neighbors', data=self.neighbor_original_set.read(corpus_size))
@@ -97,6 +99,23 @@ class AddTenantIds(object):
         self.output_data_set.create_dataset('test', data=self.query_set.read(corpus_size))
         self.output_data_set.flush()
         self.output_data_set.close()
+
+class AppendTenantIds(object):
+    def __init__(self, input_file, count):
+        self.input_file = input_file
+        self.index_set = get_data_set(HDF5DataSet.FORMAT_NAME, path=input_file, context=Context.INDEX)
+        self.count = int(count)
+    def append_tenants(self):
+        file = h5py.File(self.input_file, 'a')
+
+        corpus_size = int(self.index_set.size())
+        repeats = int(corpus_size / self.count)
+        print("\nrepeats:", repeats)
+        tenants = np.tile(np.arange(1, self.count + 1), repeats)
+        tenants_arr = tenants[:corpus_size]
+
+        file.create_dataset('tenants', data=tenants_arr)
+
 
 
 
@@ -111,7 +130,7 @@ def create_dataset_file(output_file) -> h5py.File:
 
 
 def main(args: list) -> None:
-    opts, args = getopt.getopt(args, "", ["input_file_path=", "output_file_path=", "percent=", "count="])
+    opts, args = getopt.getopt(args, "", ["input_file_path=", "output_file_path=", "percent=", "tenant_count="])
 
     print(f'Options provided are: {opts}')
     print(f'Arguments provided are: {args}')
@@ -125,7 +144,7 @@ def main(args: list) -> None:
             sys.exit()
         if opt in '--input_file_path':
             input_file_path = arg
-        elif opt in '--count':
+        elif opt in '--tenant_count':
             count = int(arg)
         elif opt in '--percent':
             percent = float(arg)
@@ -135,10 +154,11 @@ def main(args: list) -> None:
         elif opt in '--output_file_path':
             output_file_path = arg
 
-    if os.path.isfile(output_file_path):
+    if output_file_path is not None and os.path.isfile(output_file_path):
         os.remove(output_file_path)
 
-    AddTenantIds(input_file_path, output_file_path, count).generate_tenants()
+    AppendTenantIds(input_file_path, count).append_tenants()
+    #AddTenantIds(input_file_path, output_file_path, count).generate_tenants()
     #DeleteDataset(input_file_path, output_file_path, percent).generate_delete_set()
 
 
