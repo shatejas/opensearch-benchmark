@@ -849,11 +849,11 @@ class BulkVectorDataSet(Runner):
         for attempt in range(retries):
             try:
                 request_context_holder.on_client_request_start()
+                print(params["body"])
                 await opensearch.bulk(
                     body=params["body"]
                 )
                 request_context_holder.on_client_request_end()
-
                 return size, "docs"
             except ConnectionTimeout:
                 self.logger.warning("Bulk vector ingestion timed out. Retrying attempt: %d", attempt)
