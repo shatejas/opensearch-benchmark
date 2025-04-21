@@ -853,6 +853,7 @@ class BulkVectorDataSet(Runner):
                 await opensearch.bulk(
                     body=params["body"]
                 )
+                print("\n request complete")
                 request_context_holder.on_client_request_end()
                 return size, "docs"
             except ConnectionTimeout:
