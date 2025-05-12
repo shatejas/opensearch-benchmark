@@ -116,6 +116,33 @@ class AppendTenantIds(object):
 
         file.create_dataset('tenants', data=tenants_arr)
 
+    def append_tenats_bulk(self):
+        file = h5py.File(self.input_file, 'a')
+        corpus_size = int(self.index_set.size())
+        count = self.count  # Assuming self.count is defined elsewhere
+        repeat_count = 100
+
+        # Create a base array for one cycle of tenants with repetitions
+        base_tenants = np.repeat(np.arange(1, count + 1), repeat_count)
+
+        # Calculate how many times the full base pattern needs to be repeated
+        full_repeats = corpus_size // len(base_tenants)
+
+        # Create the initial tenants array by repeating the base pattern
+        tenants = np.tile(base_tenants, full_repeats)
+
+        # Calculate how many additional elements are needed from the base pattern
+        remaining = corpus_size % len(base_tenants)
+
+        # Append the remaining elements if any
+        if remaining > 0:
+            tenants_arr = np.concatenate((tenants, base_tenants[:remaining]))
+        else:
+            tenants_arr = tenants
+
+        file.create_dataset('tenants', data=tenants_arr)
+
+
 
 
 
@@ -157,7 +184,7 @@ def main(args: list) -> None:
     if output_file_path is not None and os.path.isfile(output_file_path):
         os.remove(output_file_path)
 
-    AppendTenantIds(input_file_path, count).append_tenants()
+    AppendTenantIds(input_file_path, count).append_tenats_bulk()
     #AddTenantIds(input_file_path, output_file_path, count).generate_tenants()
     #DeleteDataset(input_file_path, output_file_path, percent).generate_delete_set()
 
